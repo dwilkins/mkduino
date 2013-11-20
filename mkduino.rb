@@ -31,7 +31,9 @@ require 'fileutils'
 
 include FileUtils
 
-
+#
+# Represents the files needed for a particular arduino library
+#
 class ArduinoLibrary
   def initialize name
     @library_sources = []
@@ -75,7 +77,10 @@ LIBRARY_OUTPUT
 
 end
 
-
+#
+# Class that keeps up with the stuff needed for the Makefile.am file
+# this is most of the stuff needed to generate the automake stuff
+#
 
 class MakefileAm
   attr_accessor :source_files, :header_files, :arduino_sources
@@ -114,28 +119,27 @@ class MakefileAm
     end
   end
 
-
+  #
+  # Add a source file that we found in this directory
+  #
   def add_source_file(file)
     @source_files << Pathname.new(file).relative_path_from(Pathname.new(@project_dir)).to_s
   end
   def add_header_file(file)
     @header_files << Pathname.new(file).relative_path_from(Pathname.new(@project_dir)).to_s
   end
-  def add_arduino_source_file(file)
-    pn = Pathname.new(file)
-    puts "!! ******** File #{file} not found ******** " unless pn.exist?
-    @arduino_sources << file
-  end
-  def add_arduino_include_path file
-    pn = Pathname.new(file)
-    puts "!! ******** File #{file} not found ******** " unless pn.exist?
-    include_dir = pn.file? ? pn.dirname : file
-    @arduino_includes << include_dir.to_s unless @arduino_includes.include? include_dir.to_s
-  end
 
+  #
+  # As libraries are found, add them to our collection
+  # if they're not already there
+  #
   def add_arduino_library library
     @arduino_libraries << library  if !arduino_library library
   end
+
+  #
+  # fetch a library from our collection - nil if not there
+  #
 
   def arduino_library library
     @arduino_libraries.each do |l|
@@ -144,6 +148,10 @@ class MakefileAm
     nil
   end
 
+  #
+  # output the Makefile.am macro needed for some include
+  # files from libraries that are apparenntly always neede
+  #
   def common_includes
     @arduino_libraries.collect do |l|
       @common_libraries.include?(l.name) ? "$(lib#{l.name}_a_INCLUDES)" : nil
@@ -159,29 +167,47 @@ class MakefileAm
     /\.([h])(pp|)$/
   end
 
+  #
+  # output a list of all the libraries that are needed here
+  # for Makefile.am.   The project will depend on these
+  #
   def arduino_library_names
     @arduino_libraries.collect do |l|
       l.library_name
     end
   end
 
+  #
+  # return the linker entries for all of the libraries that we
+  # know about
+  #
   def arduino_linker_entries
     @arduino_libraries.collect do |l|
       "-l#{l.linker_name}"
     end
   end
 
+  #
+  # after finding all of the Arduino libraries, go through each
+  # one of them asking them to output themselves.
+  #
+
   def output_arduino_libraries
     output = @arduino_libraries.collect do |l|
       l.makefile_am_output
     end.join("\n")
+    #
+    # After all of the library compile lines are output, output
+    # a comprehensive list of all of the include directories associated
+    # with the libraries.   Used for the source project
+    #
     output += "\nLIBRARY_INCLUDES="
     output += @arduino_libraries.collect do |l|
       "$(lib#{l.name}_a_INCLUDES)"
     end.join(' ')
   end
 
-  def find_arduino_libraries libraries_dir = '/usr/share/arduino/libraries'
+  def find_arduino_libraries libraries_dir
     lib = nil
     Find.find(libraries_dir) do |path|
       if FileTest.directory?(path)
@@ -204,13 +230,12 @@ class MakefileAm
     end
   end
 
-  def find_arduino_sources
-    ##
-    # Add a bunch of Arduino source files to the makefile
-    # these will go into building the libcore.a library
-    # for this project
-    ##
-    Find.find('/usr/share/arduino/hardware/arduino/cores/arduino') do |path|
+  def find_source_files
+    #
+    # Root around for some source file
+    # and add them to the Makefile.am
+    #
+    Find.find(Dir.pwd) do |path|
       if FileTest.directory?(path)
         if File.basename(path)[0] == ?.
           Find.prune       # Don't look any further into this directory.
@@ -218,48 +243,21 @@ class MakefileAm
           next
         end
       elsif path =~ source_file_pattern
-        add_arduino_source_file path
+        add_source_file path
       elsif path =~ header_file_pattern
-        add_arduino_include_path path
+        add_header_file path
       end
     end
-  end
-end
 
-
-class ConfigureAc
-
-end
-
-ma = MakefileAm.new
-
-#
-# Root around for some source file
-# and add them to the Makefile.am
-#
-Find.find(Dir.pwd) do |path|
-  if FileTest.directory?(path)
-    if File.basename(path)[0] == ?.
-      Find.prune       # Don't look any further into this directory.
-    else
-      next
-    end
-  elsif path =~ ma.source_file_pattern
-    ma.add_source_file path
-  elsif path =~ ma.header_file_pattern
-    ma.add_header_file path
-  end
-end
-
-#
-# If no source files were found, make
-# the src/ directory and put in a
-# sample main.cpp file
-#
-if ma.source_files.length < 1
-  `mkdir src`  unless Dir.exist?('src')
-  File.open('src/main.cpp',"w") do |f|
-  f.puts <<-MAIN_CPP
+    #
+    # If no source files were found, make
+    # the src/ directory and put in a
+    # sample main.cpp file
+    #
+    if source_files.length < 1
+      `mkdir src`  unless Dir.exist?('src')
+      File.open('src/main.cpp',"w") do |f|
+        f.puts <<-MAIN_CPP
 #include <Arduino.h>
 
 extern "C" void __cxa_pure_virtual(void) {
@@ -286,45 +284,36 @@ int main(void)
   return 0;
 }
 MAIN_CPP
+      end
+      add_source_file project_dir + '/src/main.cpp'
+    end
   end
-  ma.add_source_file ma.project_dir + '/src/main.cpp'
-end
 
-ma.find_arduino_sources
 
-ma.find_arduino_libraries
-ma.find_arduino_libraries '/usr/share/arduino/hardware/arduino/cores'
-puts ma.to_yaml
 
-##
-# Output the Makefile.am file withe the needed variable replacements
-##
-File.open('Makefile.am',"w") do |f|
-  f.puts <<-MAKEFILE_AM
+
+  def write_makefile_am
+    File.open('Makefile.am',"w") do |f|
+      f.puts <<-MAKEFILE_AM
 ## Process this file with automake to produce Makefile.in
-bin_PROGRAMS=#{ma.project_name}
+bin_PROGRAMS=#{self.project_name}
 # MCU=atmega1280
 MCU=atmega328p
 F_CPU=-DF_CPU=16000000
 ARDUINO_VERSION=-DARDUINO=105
 ARDUINO_INSTALL=/usr/share/arduino/hardware/arduino
 ARDUINO_CORES=$(ARDUINO_INSTALL)/cores/arduino
-ARDUINO_VARIANTS=$(ARDUINO_INSTALL)/variants/#{ma.board}
-ARDUINO_COMMON_INCLUDES=#{ma.common_includes}
+ARDUINO_VARIANTS=$(ARDUINO_INSTALL)/variants/#{self.board}
+ARDUINO_COMMON_INCLUDES=#{self.common_includes}
 ARDUINO_INCLUDE_PATH=-I$(ARDUINO_VARIANTS) $(LIBRARY_INCLUDES)
-nodist_#{ma.project_name}_SOURCES=#{ma.source_files.join(' ')} #{ma.header_files.join(' ')}
-#{ma.project_name}_CFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
-#{ma.project_name}_CXXFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
-#{ma.project_name}_LDFLAGS=-L.
-#{ma.project_name}_LDADD=#{ma.arduino_linker_entries.join(' ')} -lm
+nodist_#{self.project_name}_SOURCES=#{self.source_files.join(' ')} #{self.header_files.join(' ')}
+#{self.project_name}_CFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
+#{self.project_name}_CXXFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
+#{self.project_name}_LDFLAGS=-L.
+#{self.project_name}_LDADD=#{self.arduino_linker_entries.join(' ')} -lm
 
-#lib_LIBRARIES=libcore.a #{ma.arduino_library_names.join(' ')}
-#libcore_a_CFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
-#libcore_a_CXXFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
-#libcore_a_SOURCES = #{ma.arduino_sources.join("\\\n                  ")}
-
-lib_LIBRARIES=#{ma.arduino_library_names.join(' ')}
-#{ma.output_arduino_libraries}
+lib_LIBRARIES=#{self.arduino_library_names.join(' ')}
+#{self.output_arduino_libraries}
 
 
 AM_LDFLAGS=
@@ -349,15 +338,25 @@ upload: all-am
 	$(AVRDUDE) $(AVRDUDE_FLAGS) $(AVRDUDE_WRITE_FLASH)
 MAKEFILE_AM
 
+    end
+  end
+
 end
 
-##
-# Output the configure.ac file
-##
-File.open('configure.ac',"w") do |f|
-  f.puts <<-CONFIGURE_AC
+
+class ConfigureAc
+  attr_accessor :makefile_am
+  def initialize makefile_am
+    @makefile_am = makefile_am
+  end
+  def write_configure_ac
+    ##
+    # Output the configure.ac file
+    ##
+    File.open('configure.ac',"w") do |f|
+      f.puts <<-CONFIGURE_AC
 dnl Process this file with autoconf to produce a configure script.")
-AC_INIT([#{ma.project_name}], [1.0])
+AC_INIT([#{makefile_am.project_name}], [1.0])
 dnl AC_CONFIG_SRCDIR( [ Makefile.am ] )
 AM_INIT_AUTOMAKE
 AM_CONFIG_HEADER(config.h)
@@ -386,10 +385,14 @@ AC_OUTPUT([Makefile])
 
 CONFIGURE_AC
 
+    end
+  end
 end
 
-File.open('autogen.sh',"w") do |f|
-  f.puts <<-AUTOGEN_SH
+class AutogenSh
+  def write_autogen_sh
+    File.open('autogen.sh',"w") do |f|
+      f.puts <<-AUTOGEN_SH
 #!/bin/sh
 if [ -e 'Makefile.am' ] ; then
     echo "Makefile.am Exists - reconfiguring..."
@@ -406,9 +409,38 @@ echo "Lets get your project started!"
 echo '## Process this file with automake to produce Makefile.in' >> Makefile.am
 echo No Makefile.am
 AUTOGEN_SH
+    end
+  end
 end
 
+###################################
+### This is where it all starts ###
+###################################
 
+ma = MakefileAm.new
+ma.find_arduino_libraries '/usr/share/arduino/libraries'
+ma.find_arduino_libraries '/usr/share/arduino/hardware/arduino/cores'
+ma.find_source_files
+ca = ConfigureAc.new ma
+as = AutogenSh.new
+puts ma.to_yaml
+
+##
+# Output the Makefile.am file withe the needed variable replacements
+##
+ma.write_makefile_am
+##
+# Output the configure.ac - requires a few things from Makefile.am
+##
+ca.write_configure_ac
+##
+# Finally write the autogen.sh - no replacements there
+##
+as.write_autogen_sh
+
+#
+# A few shell commands required to make it all tidy
+#
 `chmod +x autogen.sh`
 `mkdir m4` unless Dir.exist?('m4')
 `mkdir config` unless Dir.exist?('config')
