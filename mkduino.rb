@@ -31,12 +31,58 @@ require 'fileutils'
 
 include FileUtils
 
+
+class ArduinoLibrary
+  def initialize name
+    @library_sources = []
+    @name = name
+    @library_includes = []
+  end
+
+  def name
+    return @name.downcase
+  end
+
+  def add_source_file(file)
+    pn = Pathname.new(file)
+    puts "!! ******** File #{file} not found ******** " unless pn.exist?
+    @library_sources << file
+  end
+  def add_include_path file
+    pn = Pathname.new(file)
+    puts "!! ******** File #{file} not found ******** " unless pn.exist?
+    include_dir = pn.file? ? pn.dirname : file
+    @library_includes << include_dir.to_s unless @library_includes.include? include_dir.to_s
+  end
+
+  def linker_name
+    self.name
+  end
+
+  def library_name
+    "lib#{self.name}.a"
+  end
+
+  def makefile_am_output
+    output = <<LIBRARY_OUTPUT
+lib#{self.name}_a_CFLAGS=-Wall -I$(ARDUINO_VARIANTS) $(ARDUINO_COMMON_INCLUDES) $(lib#{self.name}_a_INCLUDES) -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
+lib#{self.name}_a_CXXFLAGS=-Wall -I$(ARDUINO_VARIANTS) $(ARDUINO_COMMON_INCLUDES) $(lib#{self.name}_a_INCLUDES) -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
+lib#{self.name}_a_SOURCES = #{@library_sources.join("\\\n                    ")}
+lib#{self.name}_a_INCLUDES = -I#{@library_includes.join("\\\n                    -I")}
+LIBRARY_OUTPUT
+    output
+  end
+
+end
+
+
+
 class MakefileAm
   attr_accessor :source_files, :header_files, :arduino_sources
   attr_accessor :project_name, :project_author, :project_dir
   # future stuff
   attr_accessor :git_project
-
+  attr_accessor :board, :common_includes
 
   def initialize
     @project_dir =  Dir.pwd
@@ -45,8 +91,16 @@ class MakefileAm
     @source_files = []
     @header_files = []
     @arduino_sources = []
+    @arduino_includes = []
+    @arduino_libraries = []
+    @arduino_common_includes = ['arduino', 'spi']
     @project_author = {}
     @git_project = nil
+    @common_libraries = ['arduino', 'spi']
+    @libraries_to_skip = {
+      'standard' => ['Esplora','GSM','Robot_Control','Robot_Motor','TFT','robot']
+    }
+    @board='standard'
     @project_author[:username] = ENV['USERNAME']
     git_exists = `which git`.chomp
     if git_exists &&  git_exists.length > 0
@@ -72,21 +126,110 @@ class MakefileAm
     puts "!! ******** File #{file} not found ******** " unless pn.exist?
     @arduino_sources << file
   end
+  def add_arduino_include_path file
+    pn = Pathname.new(file)
+    puts "!! ******** File #{file} not found ******** " unless pn.exist?
+    include_dir = pn.file? ? pn.dirname : file
+    @arduino_includes << include_dir.to_s unless @arduino_includes.include? include_dir.to_s
+  end
+
+  def add_arduino_library library
+    @arduino_libraries << library  if !arduino_library library
+  end
+
+  def arduino_library library
+    @arduino_libraries.each do |l|
+      return l if l.name == library
+    end
+    nil
+  end
+
+  def common_includes
+    @arduino_libraries.collect do |l|
+      @common_libraries.include?(l.name) ? "$(lib#{l.name}_a_INCLUDES)" : nil
+    end.compact.join(' ')
+  end
 
 
   def source_file_pattern
     /\.([c])(pp|)$/
   end
+
   def header_file_pattern
     /\.([h])(pp|)$/
   end
 
+  def arduino_library_names
+    @arduino_libraries.collect do |l|
+      l.library_name
+    end
+  end
+
+  def arduino_linker_entries
+    @arduino_libraries.collect do |l|
+      "-l#{l.linker_name}"
+    end
+  end
+
+  def output_arduino_libraries
+    output = @arduino_libraries.collect do |l|
+      l.makefile_am_output
+    end.join("\n")
+    output += "\nLIBRARY_INCLUDES="
+    output += @arduino_libraries.collect do |l|
+      "$(lib#{l.name}_a_INCLUDES)"
+    end.join(' ')
+  end
+
+  def find_arduino_libraries libraries_dir = '/usr/share/arduino/libraries'
+    lib = nil
+    Find.find(libraries_dir) do |path|
+      if FileTest.directory?(path)
+        if File.basename(path)[0] == ?. || File.basename(path) == 'examples' ||
+            (@libraries_to_skip[@board] && @libraries_to_skip[@board].include?(File.basename(path)) )
+          Find.prune       # Don't look any further into this directory.
+        else
+          if File.dirname(path) == libraries_dir
+            lib_name = path.split('/')[-1]
+            lib = arduino_library(lib_name) || ArduinoLibrary.new(lib_name)
+            add_arduino_library lib
+          end
+          next
+        end
+      elsif path =~ source_file_pattern
+        lib.add_source_file path
+      elsif path =~ header_file_pattern
+        lib.add_include_path path
+      end
+    end
+  end
+
+  def find_arduino_sources
+    ##
+    # Add a bunch of Arduino source files to the makefile
+    # these will go into building the libcore.a library
+    # for this project
+    ##
+    Find.find('/usr/share/arduino/hardware/arduino/cores/arduino') do |path|
+      if FileTest.directory?(path)
+        if File.basename(path)[0] == ?.
+          Find.prune       # Don't look any further into this directory.
+        else
+          next
+        end
+      elsif path =~ source_file_pattern
+        add_arduino_source_file path
+      elsif path =~ header_file_pattern
+        add_arduino_include_path path
+      end
+    end
+  end
 end
+
 
 class ConfigureAc
 
 end
-
 
 ma = MakefileAm.new
 
@@ -147,25 +290,10 @@ MAIN_CPP
   ma.add_source_file ma.project_dir + '/src/main.cpp'
 end
 
+ma.find_arduino_sources
 
-##
-# Add a bunch of Arduino source files to the makefile
-# these will go into building the libcore.a library
-# for this project
-##
-
-ma.add_arduino_source_file '/usr/share/arduino/hardware/arduino/cores/arduino/HardwareSerial.cpp'
-ma.add_arduino_source_file '/usr/share/arduino/hardware/arduino/cores/arduino/WMath.cpp'
-ma.add_arduino_source_file '/usr/share/arduino/hardware/arduino/cores/arduino/WString.cpp'
-ma.add_arduino_source_file '/usr/share/arduino/hardware/arduino/cores/arduino/Print.cpp'
-## ma.add_arduino_source_file '/usr/share/arduino/hardware/arduino/cores/arduino/IPAddress.cpp'
-ma.add_arduino_source_file '/usr/share/arduino/hardware/arduino/cores/arduino/wiring.c'
-ma.add_arduino_source_file '/usr/share/arduino/hardware/arduino/cores/arduino/wiring_analog.c'
-ma.add_arduino_source_file '/usr/share/arduino/hardware/arduino/cores/arduino/wiring_digital.c'
-ma.add_arduino_source_file '/usr/share/arduino/hardware/arduino/cores/arduino/wiring_pulse.c'
-ma.add_arduino_source_file '/usr/share/arduino/hardware/arduino/cores/arduino/wiring_shift.c'
-ma.add_arduino_source_file '/usr/share/arduino/hardware/arduino/cores/arduino/WInterrupts.c'
-
+ma.find_arduino_libraries
+ma.find_arduino_libraries '/usr/share/arduino/hardware/arduino/cores'
 puts ma.to_yaml
 
 ##
@@ -181,18 +309,22 @@ F_CPU=-DF_CPU=16000000
 ARDUINO_VERSION=-DARDUINO=105
 ARDUINO_INSTALL=/usr/share/arduino/hardware/arduino
 ARDUINO_CORES=$(ARDUINO_INSTALL)/cores/arduino
-ARDUINO_VARIANTS=$(ARDUINO_INSTALL)/variants/standard
-ARDUINO_INCLUDE_PATH=-I$(ARDUINO_CORES) -I$(ARDUINO_VARIANTS)
+ARDUINO_VARIANTS=$(ARDUINO_INSTALL)/variants/#{ma.board}
+ARDUINO_COMMON_INCLUDES=#{ma.common_includes}
+ARDUINO_INCLUDE_PATH=-I$(ARDUINO_VARIANTS) $(LIBRARY_INCLUDES)
 nodist_#{ma.project_name}_SOURCES=#{ma.source_files.join(' ')} #{ma.header_files.join(' ')}
 #{ma.project_name}_CFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
 #{ma.project_name}_CXXFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
 #{ma.project_name}_LDFLAGS=-L.
-#{ma.project_name}_LDADD=-lcore -lm
+#{ma.project_name}_LDADD=#{ma.arduino_linker_entries.join(' ')} -lm
 
-lib_LIBRARIES=libcore.a
-libcore_a_CFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
-libcore_a_CXXFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
-libcore_a_SOURCES = #{ma.arduino_sources.join("\\\n                  ")}
+#lib_LIBRARIES=libcore.a #{ma.arduino_library_names.join(' ')}
+#libcore_a_CFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
+#libcore_a_CXXFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
+#libcore_a_SOURCES = #{ma.arduino_sources.join("\\\n                  ")}
+
+lib_LIBRARIES=#{ma.arduino_library_names.join(' ')}
+#{ma.output_arduino_libraries}
 
 
 AM_LDFLAGS=
