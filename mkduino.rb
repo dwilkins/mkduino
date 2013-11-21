@@ -98,10 +98,9 @@ class MakefileAm
     @arduino_sources = []
     @arduino_includes = []
     @arduino_libraries = []
-    @arduino_common_includes = ['arduino', 'spi']
     @project_author = {}
     @git_project = nil
-    @common_libraries = ['arduino', 'spi']
+    @common_libraries = ['arduino', 'spi','wire']
     @libraries_to_skip = {
       'standard' => ['Esplora','GSM','Robot_Control','Robot_Motor','TFT','robot']
     }
