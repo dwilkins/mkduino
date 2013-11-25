@@ -67,8 +67,8 @@ class ArduinoLibrary
 
   def makefile_am_output
     output = <<LIBRARY_OUTPUT
-lib#{self.name}_a_CFLAGS=-Wall -I$(ARDUINO_VARIANTS) $(ARDUINO_COMMON_INCLUDES) $(lib#{self.name}_a_INCLUDES) -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
-lib#{self.name}_a_CXXFLAGS=-Wall -I$(ARDUINO_VARIANTS) $(ARDUINO_COMMON_INCLUDES) $(lib#{self.name}_a_INCLUDES) -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
+lib#{self.name}_a_CFLAGS=-Wall -I$(ARDUINO_VARIANTS) $(ARDUINO_COMMON_INCLUDES) $(lib#{self.name}_a_INCLUDES) -Wl,--gc-sections -ffunction-sections -fdata-sections -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
+lib#{self.name}_a_CXXFLAGS=-Wall -I$(ARDUINO_VARIANTS) $(ARDUINO_COMMON_INCLUDES) $(lib#{self.name}_a_INCLUDES) -Wl,--gc-sections -ffunction-sections -fdata-sections -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
 lib#{self.name}_a_SOURCES = #{@library_sources.join("\\\n                    ")}
 lib#{self.name}_a_INCLUDES = -I#{@library_includes.join("\\\n                    -I")}
 LIBRARY_OUTPUT
@@ -305,9 +305,9 @@ ARDUINO_CORES=$(ARDUINO_INSTALL)/cores/arduino
 ARDUINO_VARIANTS=$(ARDUINO_INSTALL)/variants/#{self.board}
 ARDUINO_COMMON_INCLUDES=#{self.common_includes}
 ARDUINO_INCLUDE_PATH=-I$(ARDUINO_VARIANTS) $(LIBRARY_INCLUDES)
-nodist_#{self.project_name}_SOURCES=#{self.source_files.join(' ')} #{self.header_files.join(' ')}
-#{self.project_name}_CFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
-#{self.project_name}_CXXFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
+nodist_#{self.project_name}_SOURCES=#{self.source_files.join(' ')}
+#{self.project_name}_CFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -Wl,--gc-sections -ffunction-sections -fdata-sections -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
+#{self.project_name}_CXXFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -Wl,--gc-sections -ffunction-sections -fdata-sections -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
 #{self.project_name}_LDFLAGS=-L.
 #{self.project_name}_LDADD=#{self.arduino_linker_entries.join(' ')} -lm
 
@@ -316,8 +316,8 @@ lib_LIBRARIES=#{self.arduino_library_names.join(' ')}
 
 
 AM_LDFLAGS=
-AM_CXXFLAGS=-g
-AM_CFLAGS=-g
+AM_CXXFLAGS=-g0 -Os
+AM_CFLAGS=-g0 -Os
 VPATH=/usr/share/arduino/hardware/arduino/cores/arduino
 
 # AVRDUDE_PORT=/dev/ttyACM0
@@ -333,7 +333,7 @@ AVRDUDE_FLAGS = -q -D -C/etc/avrdude/avrdude.conf -p$(MCU) -P$(AVRDUDE_PORT) -c$
 
 .PHONY: upload
 upload: all-am
-	$(OBJCOPY) -O $(FORMAT) -R .eeprom $(bin_PROGRAMS) $(bin_PROGRAMS).hex
+	$(OBJCOPY) -S -O $(FORMAT) $(bin_PROGRAMS) $(bin_PROGRAMS).hex
 	$(AVRDUDE) $(AVRDUDE_FLAGS) $(AVRDUDE_WRITE_FLASH)
 MAKEFILE_AM
 
