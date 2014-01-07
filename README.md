@@ -11,13 +11,16 @@ of he environment.  It would probably be simple to find the arduino environment 
 hardcoding it.  Also, doing a `git init` and adding certain files to the repo would be really
 handy for someone that uses this regularly.   Again - add github issues or send pull requests...
 
+## Installation
+
+`gem install mkduino`
 
 ## Usage
 ========
 Go to the directory where your source code is(or should be):
 
 ```
-./path/to/mkduino.rb
+mkduino
 ./autogen.sh
 ./configure --host=avr
 make
@@ -37,18 +40,18 @@ initially configured for an Arduino Pro Mini, but there are some variables that 
 be changed in this file to customize it.   Any changes made to this file will be
 automatically picked up by make on your next make invocation.
 
-* `ARDUINO_VERSION=-DARDUINO=105`  
+* `ARDUINO_VERSION=-DARDUINO=105`
   Define of what version of the Arduino libaries you're using.
-* `ARDUINO_INSTALL=/usr/share/arduino/hardware/arduino`  
+* `ARDUINO_INSTALL=/usr/share/arduino/hardware/arduino`
   Where the Arduino library stuff is installed.   This is the default on a Fedora system
-* `MCU=atmega328p`  
+* `MCU=atmega328p`
    Change this if you have a different supported ATMEL chip.
    For instance set it to `MCU=atmega1280` for an ATMEL atmega1280 chip
-* `ARDUINO_VARIANTS=$(ARDUINO_INSTALL)/variants/standard`  
+* `ARDUINO_VARIANTS=$(ARDUINO_INSTALL)/variants/standard`
    You many need to change `standard` to something else for mega 1280 and 2560 chips
-* `AVRDUDE_PORT=/dev/ttyUSB0`  
+* `AVRDUDE_PORT=/dev/ttyUSB0`
   The port that `make upload` will try to send the code to.
-* `AVRDUDE_PROGRAMMER = arduino*`  
+* `AVRDUDE_PROGRAMMER = arduino*`
   The `avrdude` programmer type.
   Check the [`avrdude` documentation](http://www.nongnu.org/avrdude/user-manual)
 

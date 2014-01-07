@@ -4,7 +4,7 @@
 #   Ruby script for generating a GNU Automake (ish)
 #   environment for Arduino development
 #
-# (C) Copyright 2013
+# (C) Copyright 2013,2014
 # David H. Wilkins  <dwilkins@conecuh.com>
 #
 # This program is free software; you can redistribute it and/or
