@@ -24,6 +24,54 @@
 #
 
 require "mkduino"
+require 'optparse'
+
+options = {}
+OptionParser.new do |opts|
+  options[:verbose] = false
+  options[:git] = false
+  options[:update] = false
+  options[:overwrite] = false
+  options[:num_args] = ARGV.length
+
+  opts.banner = "Usage: #{opts.program_name} [options]"
+  opts.on("-v", "--[no-]verbose", "Run verbosely") do |v|
+    options[:verbose] = v
+  end
+#  opts.on("-g","--[no-]git","Create / update git repo") do |v|
+#    options[:git] = v
+#  end
+#  opts.on("-u","--[no-]update","Update current project files") do |v|
+#    options[:update] = v
+#  end
+  opts.on("-o","--[no-]overwrite","Overwrite current project files") do |v|
+    options[:overwrite] = v
+  end
+  opts.on_tail("-h", "--help", "Show this message") do
+    puts opts
+    exit
+  end
+
+  if options[:num_args] < 1
+    puts opts
+    exit
+  end
+
+end.parse!
+
+if((Pathname.new("Makefile.am").exist? ||
+    Pathname.new("configure.ac").exist? ||
+    Pathname.new("autogen.sh").exist? ||
+    Pathname.new("config/config.h").exist? ||
+    Pathname.new("NEWS").exist? ||
+    Pathname.new("README").exist? ||
+    Pathname.new("AUTHORS").exist? ||
+    Pathname.new("ChangeLog").exist?) && !options[:overwrite])
+  puts "Please supply --overwrite to ovewrite existing files"
+  exit
+end
+
+
 
 ma = Mkduino::MakefileAm.new
 ma.find_arduino_libraries '/usr/share/arduino/libraries'
@@ -31,7 +79,9 @@ ma.find_arduino_libraries '/usr/share/arduino/hardware/arduino/cores'
 ma.find_source_files
 ca = Mkduino::ConfigureAc.new ma
 as = Mkduino::AutogenSh.new
-puts ma.to_yaml
+if options[:verbose]
+  puts ma.to_yaml
+end
 
 ##
 # Output the Makefile.am file withe the needed variable replacements

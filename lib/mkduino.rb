@@ -30,7 +30,6 @@ module Mkduino
       pn = Pathname.new(file)
       puts "!! ******** File #{file} not found ******** " unless pn.exist?
       include_dir = pn.file? ? pn.dirname : file
-      puts "Add include for #{file} = #{include_dir}"
 
       @library_includes << include_dir.to_s unless @library_includes.include? include_dir.to_s
     end
@@ -111,8 +110,6 @@ LIBRARY_OUTPUT
       pn = Pathname.new(file)
       puts "!! ******** File #{file} not found ******** " unless pn.exist?
       include_dir = pn.file? ? pn.dirname : file
-      puts "Add include for #{file} = #{include_dir}"
-
       @project_includes << include_dir.to_s unless @project_includes.include? include_dir.to_s
     end
 
@@ -283,6 +280,7 @@ MAIN_CPP
 
 
     def write_makefile_am
+      puts "Writing Makefile.am"
       File.open('Makefile.am',"w") do |f|
         f.puts <<-MAKEFILE_AM
 ## Process this file with automake to produce Makefile.in
@@ -345,6 +343,7 @@ MAKEFILE_AM
       ##
       # Output the configure.ac file
       ##
+      puts "Writing configure.ac"
       File.open('configure.ac',"w") do |f|
         f.puts <<-CONFIGURE_AC
 dnl Process this file with autoconf to produce a configure script.")
@@ -383,6 +382,7 @@ CONFIGURE_AC
 
   class AutogenSh
     def write_autogen_sh
+      puts("Writing autogen.sh")
       File.open('autogen.sh',"w") do |f|
       f.puts <<-AUTOGEN_SH
 #!/bin/sh
