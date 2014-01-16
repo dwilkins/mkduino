@@ -30,6 +30,8 @@ module Mkduino
       pn = Pathname.new(file)
       puts "!! ******** File #{file} not found ******** " unless pn.exist?
       include_dir = pn.file? ? pn.dirname : file
+      puts "Add include for #{file} = #{include_dir}"
+
       @library_includes << include_dir.to_s unless @library_includes.include? include_dir.to_s
     end
 
@@ -60,6 +62,7 @@ LIBRARY_OUTPUT
   class MakefileAm
     attr_accessor :source_files, :header_files, :arduino_sources
     attr_accessor :project_name, :project_author, :project_dir
+    attr_accessor :project_includes
     # future stuff
     attr_accessor :git_project
     attr_accessor :board, :common_includes
@@ -70,6 +73,7 @@ LIBRARY_OUTPUT
       @project_name.tr!('.','_')
       @source_files = []
       @header_files = []
+      @project_includes = []
       @arduino_sources = []
       @arduino_includes = []
       @arduino_libraries = []
@@ -97,11 +101,21 @@ LIBRARY_OUTPUT
     # Add a source file that we found in this directory
     #
     def add_source_file(file)
-      @source_files << Pathname.new(file).relative_path_from(Pathname.new(@project_dir)).to_s
+      @source_files << "../" + Pathname.new(file).relative_path_from(Pathname.new(@project_dir)).to_s
     end
     def add_header_file(file)
-      @header_files << Pathname.new(file).relative_path_from(Pathname.new(@project_dir)).to_s
+      @header_files << "../" + Pathname.new(file).relative_path_from(Pathname.new(@project_dir)).to_s
     end
+
+    def add_include_path file
+      pn = Pathname.new(file)
+      puts "!! ******** File #{file} not found ******** " unless pn.exist?
+      include_dir = pn.file? ? pn.dirname : file
+      puts "Add include for #{file} = #{include_dir}"
+
+      @project_includes << include_dir.to_s unless @project_includes.include? include_dir.to_s
+    end
+
 
     #
     # As libraries are found, add them to our collection
@@ -124,7 +138,7 @@ LIBRARY_OUTPUT
 
     #
     # output the Makefile.am macro needed for some include
-    # files from libraries that are apparenntly always neede
+    # files from libraries that are apparently always needed
     #
     def common_includes
       @arduino_libraries.collect do |l|
@@ -220,6 +234,8 @@ LIBRARY_OUTPUT
           add_source_file path
         elsif path =~ header_file_pattern
           add_header_file path
+          add_include_path path
+
         end
       end
 
@@ -281,10 +297,12 @@ ARDUINO_VARIANTS=$(ARDUINO_INSTALL)/variants/#{self.board}
 ARDUINO_COMMON_INCLUDES=#{self.common_includes}
 ARDUINO_INCLUDE_PATH=-I$(ARDUINO_VARIANTS) $(LIBRARY_INCLUDES)
 nodist_#{self.project_name}_SOURCES=#{self.source_files.join(' ')}
-#{self.project_name}_CFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -Wl,--gc-sections -ffunction-sections -fdata-sections -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
-#{self.project_name}_CXXFLAGS=-Wall $(ARDUINO_INCLUDE_PATH) -Wl,--gc-sections -ffunction-sections -fdata-sections -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
+
+#{self.project_name}_CFLAGS=-Wall $(#{self.project_name}_INCLUDES) $(ARDUINO_INCLUDE_PATH) -Wl,--gc-sections -ffunction-sections -fdata-sections -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
+#{self.project_name}_CXXFLAGS=-Wall $(#{self.project_name}_INCLUDES) $(ARDUINO_INCLUDE_PATH) -Wl,--gc-sections -ffunction-sections -fdata-sections -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
 #{self.project_name}_LDFLAGS=-L.
 #{self.project_name}_LDADD=#{self.arduino_linker_entries.join(' ')} -lm
+#{self.project_name}_INCLUDES=-I#{self.project_includes.join("\\\n                    -I")}
 
 lib_LIBRARIES=#{self.arduino_library_names.join(' ')}
 #{self.output_arduino_libraries}
@@ -374,7 +392,7 @@ if [ -e 'Makefile.am' ] ; then
     echo
     echo
     echo "************************************"
-    echo "** Now run ./configure --host=avr **"
+    echo "** Now run mkdir build ; cd build ; ../configure --host=avr **"
     echo "************************************"
     exit
 fi
