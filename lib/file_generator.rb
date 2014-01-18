@@ -20,14 +20,13 @@ module Mkduino
       File.open("#{@output_directory}#{@output_filename}","w") do |f|
         yield f
       end
-      save_file
     end
 
     def save_file
       unless Dir.exist?(@backup_directory)
         Dir.mkdir(@backup_directory)
       end
-      File.cp("#{output_directory}#{@output_filename}",@backup_directory)
+      File::cp("#{output_directory}#{@output_filename}",@backup_directory)
     end
 
     def save_user_updates
