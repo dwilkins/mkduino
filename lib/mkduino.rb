@@ -1,3 +1,25 @@
+# mkduino.rb
+#
+# (C) Copyright 2013,2014
+# David H. Wilkins  <dwilkins@conecuh.com>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as
+# published by the Free Software Foundation; either version 2 of
+# the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+# MA 02111-1307 USA
+#
+
+
 require "mkduino/version"
 require 'yaml'
 require 'find'
@@ -6,10 +28,22 @@ require 'fileutils'
 
 include FileUtils
 
+require_relative "file_generator"
 require_relative "makefile_am"
-
+require_relative "configure_ac"
+require_relative "autogen_sh"
 
 module Mkduino
+  GENERATED_FILES = ["Makefile.am",
+                     "configure.ac",
+                     "autogen.sh",
+                     "config/config.h",
+                     "NEWS",
+                     "README",
+                     "AUTHORS",
+                     "ChangeLog"]
+
+
   #
   # Represents the files needed for a particular arduino library
   #
@@ -57,74 +91,4 @@ LIBRARY_OUTPUT
   end
 
 
-  class ConfigureAc
-    attr_accessor :makefile_am
-    def initialize makefile_am
-      @makefile_am = makefile_am
-    end
-    def write_configure_ac
-      ##
-      # Output the configure.ac file
-      ##
-      puts "Writing configure.ac"
-      File.open('configure.ac',"w") do |f|
-        f.puts <<-CONFIGURE_AC
-dnl Process this file with autoconf to produce a configure script.")
-AC_INIT([#{makefile_am.project_name}], [1.0])
-dnl AC_CONFIG_SRCDIR( [ Makefile.am ] )
-AM_INIT_AUTOMAKE
-AM_CONFIG_HEADER(config.h)
-dnl AM_CONFIG_HEADER(config.h)
-dnl Checks for programs.
-AC_PROG_CC( avr-gcc )
-AC_PROG_CXX( avr-g++ )
-AC_PROG_RANLIB( avr-ranlib )
-AC_PATH_PROG(OBJCOPY, avr-objcopy)
-AC_PATH_PROG(AVRDUDE, avrdude)
-
-AC_ISC_POSIX
-
-dnl Checks for libraries.
-
-dnl Checks for header files.
-AC_HAVE_HEADERS( Arduino.h )
-
-dnl Checks for library functions.
-
-dnl Check for st_blksize in struct stat
-
-
-dnl internationalization macros
-AC_OUTPUT([Makefile])
-
-CONFIGURE_AC
-
-      end
-    end
-  end
-
-  class AutogenSh
-    def write_autogen_sh
-      puts("Writing autogen.sh")
-      File.open('autogen.sh',"w") do |f|
-      f.puts <<-AUTOGEN_SH
-#!/bin/sh
-if [ -e 'Makefile.am' ] ; then
-    echo "Makefile.am Exists - reconfiguring..."
-    autoreconf --force --install -I config -I m4
-    echo
-    echo
-    echo "************************************"
-    echo "** Now run mkdir build ; cd build ; ../configure --host=avr **"
-    echo "************************************"
-    exit
-fi
-echo "Lets get your project started!"
-
-echo '## Process this file with automake to produce Makefile.in' >> Makefile.am
-echo No Makefile.am
-AUTOGEN_SH
-      end
-    end
-  end
 end

@@ -23,6 +23,13 @@
 # MA 02111-1307 USA
 #
 
+#
+# get_updates -> backup files -> output -> save -> apply_updates
+#
+
+
+
+
 require "mkduino"
 require 'optparse'
 
@@ -33,7 +40,8 @@ OptionParser.new do |opts|
   options[:update] = false
   options[:overwrite] = false
   options[:num_args] = ARGV.length
-
+  options[:autoconfigure] = false
+  options[:device] = "standard"
   opts.banner = "Usage: #{opts.program_name} [options]"
   opts.on("-v", "--[no-]verbose", "Run verbosely") do |v|
     options[:verbose] = v
@@ -44,6 +52,9 @@ OptionParser.new do |opts|
 #  opts.on("-u","--[no-]update","Update current project files") do |v|
 #    options[:update] = v
 #  end
+  opts.on('-a',"--[no-]autoconfigure","automatically run autogen.sh and configure") do |v|
+    options[:autoconfigure] = v
+  end
   opts.on("-o","--[no-]overwrite","Overwrite current project files") do |v|
     options[:overwrite] = v
   end
@@ -59,14 +70,9 @@ OptionParser.new do |opts|
 
 end.parse!
 
-if((Pathname.new("Makefile.am").exist? ||
-    Pathname.new("configure.ac").exist? ||
-    Pathname.new("autogen.sh").exist? ||
-    Pathname.new("config/config.h").exist? ||
-    Pathname.new("NEWS").exist? ||
-    Pathname.new("README").exist? ||
-    Pathname.new("AUTHORS").exist? ||
-    Pathname.new("ChangeLog").exist?) && !options[:overwrite])
+if !options[:overwrite] && Mkduino::GENERATED_FILES.collect do |gf|
+    Pathname.new("Makefile.am").exist? ? true : nil
+  end.compact.any?
   puts "Please supply --overwrite to ovewrite existing files"
   exit
 end
@@ -78,7 +84,7 @@ ma.find_arduino_libraries '/usr/share/arduino/libraries'
 ma.find_arduino_libraries '/usr/share/arduino/hardware/arduino/cores'
 ma.find_source_files
 ca = Mkduino::ConfigureAc.new ma
-as = Mkduino::AutogenSh.new
+as = Mkduino::AutogenSh.new "autogen.sh"
 if options[:verbose]
   puts ma.to_yaml
 end
@@ -99,7 +105,6 @@ as.write_autogen_sh
 #
 # A few shell commands required to make it all tidy
 #
-`chmod +x autogen.sh`
 `mkdir m4` unless Dir.exist?('m4')
 `mkdir config` unless Dir.exist?('config')
 `touch config/config.h`
@@ -108,6 +113,19 @@ as.write_autogen_sh
 `touch AUTHORS`
 `touch ChangeLog`
 
-puts "*******************************"
-puts "** now run ./autogen.sh      **"
-puts "*******************************"
+if options[:autoconfigure]
+  `./autogen.sh`
+  unless Dir.exist?('build')
+    Dir.mkdir('build')
+  end
+  Dir.chdir("build")
+  `../configure --host=avr`
+  `make hex`
+  puts "*******************************"
+  puts "** now run cd build ; make   **"
+  puts "*******************************"
+else
+  puts "*******************************"
+  puts "** now run ./autogen.sh      **"
+  puts "*******************************"
+end

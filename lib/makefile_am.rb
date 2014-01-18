@@ -1,3 +1,23 @@
+# makefile_am.rb
+#
+# (C) Copyright 2013,2014
+# David H. Wilkins  <dwilkins@conecuh.com>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as
+# published by the Free Software Foundation; either version 2 of
+# the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+# MA 02111-1307 USA
+#
 #
 # Class that keeps up with the stuff needed for the Makefile.am file
 # this is most of the stuff needed to generate the automake stuff
@@ -18,7 +38,7 @@ module Mkduino
       @project_name.tr!('.-','__')
       @source_files = []
       @header_files = []
-      @project_includes = []
+      @project_includes = ["."]
       @arduino_sources = []
       @arduino_includes = []
       @arduino_libraries = []
@@ -268,9 +288,11 @@ AVRDUDE_WRITE_FLASH = -U flash:w:$(bin_PROGRAMS).hex
 AVRDUDE_FLAGS = -q -D -C/etc/avrdude/avrdude.conf -p$(MCU) -P$(AVRDUDE_PORT) -c$(AVRDUDE_PROGRAMMER) -b$(UPLOAD_RATE)
 
 
-.PHONY: upload
-upload: all-am
+.PHONY: upload hex
+hex: all-am
 	$(OBJCOPY) -S -O $(FORMAT) $(bin_PROGRAMS) $(bin_PROGRAMS).hex
+
+upload: hex
 	$(AVRDUDE) $(AVRDUDE_FLAGS) $(AVRDUDE_WRITE_FLASH)
 MAKEFILE_AM
 
