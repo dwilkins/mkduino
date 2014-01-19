@@ -24,15 +24,19 @@
 #
 
 module Mkduino
-  class MakefileAm
+  class MakefileAm < Mkduino::GeneratedFile
     attr_accessor :source_files, :header_files, :arduino_sources
     attr_accessor :project_name, :project_author, :project_dir
     attr_accessor :project_includes
+
+    attr_accessor :mcu, :clock_speed, :variant, :device, :baud_rate, :programmer
+
     # future stuff
     attr_accessor :git_project
-    attr_accessor :board, :common_includes
+    attr_accessor :common_includes
 
-    def initialize
+    def initialize output_filename, options
+      super output_filename, options
       @project_dir =  Dir.pwd
       @project_name = File.basename @project_dir
       @project_name.tr!('.-','__')
@@ -44,11 +48,20 @@ module Mkduino
       @arduino_libraries = []
       @project_author = {}
       @git_project = nil
+
+      @options = options
+      @mcu = @options[:mcu] || "atmega328p"
+      @clock_speed = @options[:clock_speed] || "16000000"
+      @variant = @options[:variant] || "standard"
+      @device = @options[:device] || "/dev/USB0"
+      @baud_rate = @options[:baud_rate] || "57600"
+      @programmer = @options[:programmer] || "arduino"
+
       @common_libraries = ['arduino', 'spi','wire']
       @libraries_to_skip = {
-        'standard' => ['Esplora','GSM','Robot_Control','Robot_Motor','TFT','robot']
+        'standard' => ['Esplora','GSM','Robot_Control','Robot_Motor','TFT','robot'],
+        'mega' => ['Esplora','GSM','Robot_Control','Robot_Motor','TFT','robot']
       }
-      @board='standard'
       @project_author[:username] = ENV['USERNAME']
       git_exists = `which git`.chomp
       if git_exists &&  git_exists.length > 0
@@ -163,7 +176,7 @@ module Mkduino
       Find.find(libraries_dir) do |path|
         if FileTest.directory?(path)
           if File.basename(path)[0] == ?. || File.basename(path) == 'examples' ||
-              (@libraries_to_skip[@board] && @libraries_to_skip[@board].include?(File.basename(path)) )
+              (@libraries_to_skip[@variant] && @libraries_to_skip[@variant].include?(File.basename(path)) )
             Find.prune       # Don't look any further into this directory.
           else
             if File.dirname(path) == libraries_dir
@@ -246,18 +259,18 @@ MAIN_CPP
 
 
     def write_makefile_am
-      puts "Writing Makefile.am"
-      File.open('Makefile.am',"w") do |f|
+      puts "Writing #{@output_file}"
+      write_file do |f|
         f.puts <<-MAKEFILE_AM
 ## Process this file with automake to produce Makefile.in
 bin_PROGRAMS=#{self.project_name}
-# MCU=atmega1280
-MCU=atmega328p
-F_CPU=-DF_CPU=16000000
+
+MCU=#{self.mcu}
+F_CPU=-DF_CPU=#{self.clock_speed}
 ARDUINO_VERSION=-DARDUINO=105
 ARDUINO_INSTALL=/usr/share/arduino/hardware/arduino
 ARDUINO_CORES=$(ARDUINO_INSTALL)/cores/arduino
-ARDUINO_VARIANTS=$(ARDUINO_INSTALL)/variants/#{self.board}
+ARDUINO_VARIANTS=$(ARDUINO_INSTALL)/variants/#{self.variant}
 ARDUINO_COMMON_INCLUDES=#{self.common_includes}
 ARDUINO_INCLUDE_PATH=-I$(ARDUINO_VARIANTS) $(LIBRARY_INCLUDES)
 nodist_#{self.project_name}_SOURCES=#{self.source_files.join(' ')}
@@ -277,11 +290,9 @@ AM_CXXFLAGS=-g0 -Os
 AM_CFLAGS=-g0 -Os
 VPATH=/usr/share/arduino/hardware/arduino/cores/arduino
 
-# AVRDUDE_PORT=/dev/ttyACM0
-AVRDUDE_PORT=/dev/ttyUSB0
-AVRDUDE_PROGRAMMER = arduino
-# UPLOAD_RATE = 115200
-UPLOAD_RATE = 57600
+AVRDUDE_PORT = #{self.device}
+AVRDUDE_PROGRAMMER = #{self.programmer}
+UPLOAD_RATE = #{self.baud_rate}
 FORMAT=ihex
 
 AVRDUDE_WRITE_FLASH = -U flash:w:$(bin_PROGRAMS).hex

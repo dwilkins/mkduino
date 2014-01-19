@@ -32,7 +32,7 @@ require_relative "file_generator"
 require_relative "makefile_am"
 require_relative "configure_ac"
 require_relative "autogen_sh"
-
+require_relative "probe"
 module Mkduino
   GENERATED_FILES = ["Makefile.am",
                      "configure.ac",

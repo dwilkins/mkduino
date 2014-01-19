@@ -34,15 +34,29 @@ require "mkduino"
 require 'optparse'
 
 options = {}
+default_options = {}
+probed_options = {}
+probe = Mkduino::Probe.new
+
 OptionParser.new do |opts|
-  options[:verbose] = false
-  options[:git] = false
-  options[:update] = false
-  options[:overwrite] = false
-  options[:num_args] = ARGV.length
-  options[:autoconfigure] = false
-  options[:device] = "standard"
+  default_options[:verbose] = false
+  default_options[:git] = false
+  default_options[:update] = false
+  default_options[:overwrite] = false
+  default_options[:mcu] = "atmega328p"
+  default_options[:num_args] = ARGV.length
+  default_options[:autoconfigure] = false
+  default_options[:device] = "/dev/ttyUSB0"
+  default_options[:variant] = "standard"
+  default_options[:clock_speed] = "16000000"
+  default_options[:baud_rate] = "57600"
+  default_options[:programmer] = "arduino"
   opts.banner = "Usage: #{opts.program_name} [options]"
+  opts.on("-p","--[no-]probe","Probe for stuff") do |v|
+    probe.probe
+    probed_options.merge! probe.options
+  end
+
   opts.on("-v", "--[no-]verbose", "Run verbosely") do |v|
     options[:verbose] = v
   end
@@ -55,20 +69,46 @@ OptionParser.new do |opts|
   opts.on('-a',"--[no-]autoconfigure","automatically run autogen.sh and configure") do |v|
     options[:autoconfigure] = v
   end
+
+  opts.on("-b","--board BOARD",Mkduino::Probe::BOARDS.keys,"Arduino Board Type", "#{Mkduino::Probe::BOARDS.keys.join(',')}") do |v|
+    options.merge! Mkduino::Probe::BOARDS[v]
+  end
+
+  opts.on("--programmer PROGRAMMER",["arduino","stk500"],"AVRDUDE Programmer type", "arduino, stk500") do |v|
+    options[:programmer] = v
+  end
+
+
   opts.on("-o","--[no-]overwrite","Overwrite current project files") do |v|
     options[:overwrite] = v
   end
+
+  opts.on("-c","--clock SPEED",Integer,"Clock speed") do |v|
+    options[:clock_speed] = v
+  end
+
+  opts.on("-t","--type TYPE",["mega","standard"],"Arduino library type (aka variant)") do |v|
+    options[:variant] = v
+  end
+
+  opts.on("-d","--device DEVICE","Arduino programming device.","Example: /dev/ttyUSB0.") do |v|
+    options[:device] = v
+  end
+
   opts.on_tail("-h", "--help", "Show this message") do
     puts opts
     exit
   end
 
-  if options[:num_args] < 1
+  if( default_options[:num_args] < 1)
     puts opts
     exit
   end
-
 end.parse!
+
+
+default_options.merge!( probed_options.merge!( options ) )
+
 
 if !options[:overwrite] && Mkduino::GENERATED_FILES.collect do |gf|
     Pathname.new("Makefile.am").exist? ? true : nil
@@ -79,7 +119,7 @@ end
 
 
 
-ma = Mkduino::MakefileAm.new
+ma = Mkduino::MakefileAm.new "Makefile.am", options
 ma.find_arduino_libraries '/usr/share/arduino/libraries'
 ma.find_arduino_libraries '/usr/share/arduino/hardware/arduino/cores'
 ma.find_source_files
