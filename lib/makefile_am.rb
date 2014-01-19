@@ -275,7 +275,7 @@ ARDUINO_COMMON_INCLUDES=#{self.common_includes}
 ARDUINO_INCLUDE_PATH=-I$(ARDUINO_VARIANTS) $(LIBRARY_INCLUDES)
 nodist_#{self.project_name}_SOURCES=#{self.source_files.join(' ')}
 
-#{self.project_name}_CFLAGS=-Wall $(#{self.project_name}_INCLUDES) $(ARDUINO_INCLUDE_PATH) -Wl,--gc-sections -ffunction-sections -fdata-sections -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
+#{self.project_name}_CFLAGS=-Wall $(#{self.project_name}_INCLUDES) $(ARDUINO_INCLUDE_PATH) -Wl,--gc-sections -fno-caller-saves -ffunction-sections -fdata-sections -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
 #{self.project_name}_CXXFLAGS=-Wall $(#{self.project_name}_INCLUDES) $(ARDUINO_INCLUDE_PATH) -Wl,--gc-sections -ffunction-sections -fdata-sections -gstabs -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
 #{self.project_name}_LDFLAGS=-L.
 #{self.project_name}_LDADD=#{self.arduino_linker_entries.join(' ')} -lm

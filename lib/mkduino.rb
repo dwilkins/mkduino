@@ -81,7 +81,7 @@ module Mkduino
 
     def makefile_am_output
       output = <<LIBRARY_OUTPUT
-lib#{self.name}_a_CFLAGS=-Wall -I$(ARDUINO_VARIANTS) $(ARDUINO_COMMON_INCLUDES) $(lib#{self.name}_a_INCLUDES) -Wl,--gc-sections -ffunction-sections -fdata-sections -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
+lib#{self.name}_a_CFLAGS=-Wall -I$(ARDUINO_VARIANTS) $(ARDUINO_COMMON_INCLUDES) $(lib#{self.name}_a_INCLUDES) -Wl,--gc-sections -fno-caller-saves -ffunction-sections -fdata-sections -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
 lib#{self.name}_a_CXXFLAGS=-Wall -I$(ARDUINO_VARIANTS) $(ARDUINO_COMMON_INCLUDES) $(lib#{self.name}_a_INCLUDES) -Wl,--gc-sections -ffunction-sections -fdata-sections -mmcu=$(MCU) $(F_CPU) $(ARDUINO_VERSION) -D__AVR_LIBC_DEPRECATED_ENABLE__
 lib#{self.name}_a_SOURCES = #{@library_sources.join("\\\n                    ")}
 lib#{self.name}_a_INCLUDES = -I#{@library_includes.join("\\\n                    -I")}
