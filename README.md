@@ -20,13 +20,40 @@ handy for someone that uses this regularly.   Again - add github issues or send 
 Go to the directory where your source code is(or should be):
 
 ```
-mkduino
+mkduino -p
 ./autogen.sh
+mkdir build
+cd build
 ./configure --host=avr
 make
 make upload
 ```
+Or, use a shortcut
+```
+mkduino -pa
+cd build
+make upload
+```
 
+## Command line options
+=======================
+<pre>
+Usage: mkduino [options]
+    -p, --[no-]probe                 Probe for stuff
+    -v, --[no-]verbose               Run verbosely
+    -a, --[no-]autoconfigure         automatically run autogen.sh and configure
+    -b, --board BOARD                Arduino Board Type
+                                     mega,mega1280,uno,mini,mini3v
+        --programmer PROGRAMMER      AVRDUDE Programmer type
+                                     arduino, stk500
+    -o, --[no-]overwrite             Overwrite current project files
+    -c, --clock SPEED                Clock speed
+    -t, --type TYPE                  Arduino library type (aka variant)
+    -d, --device DEVICE              Arduino programming device.
+                                     Example: /dev/ttyUSB0.
+    -h, --help                       Show this message
+
+</pre>
 ## Files Generated
 ==================
 
