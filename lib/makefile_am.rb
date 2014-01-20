@@ -59,8 +59,8 @@ module Mkduino
 
       @common_libraries = ['arduino', 'spi','wire']
       @libraries_to_skip = {
-        'standard' => ['Esplora','GSM','Robot_Control','Robot_Motor','TFT','robot'],
-        'mega' => ['Esplora','GSM','Robot_Control','Robot_Motor','TFT','robot']
+        'standard' => ['Esplora','GSM','Robot_Control','Robot_Motor','TFT','robot', 'WiFi'],
+        'mega' => ['Esplora','GSM','Robot_Control','Robot_Motor','TFT','robot', 'WiFi']
       }
       @project_author[:username] = ENV['USERNAME']
       git_exists = `which git`.chomp
